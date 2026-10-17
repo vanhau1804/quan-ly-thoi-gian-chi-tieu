@@ -66,26 +66,112 @@ const CATS = {
 };
 
 /* ---------- Âm thanh & thông báo ---------- */
+const MAX_SOUND_BYTES = 5 * 1024 * 1024; // file nhạc chuông tự chọn tối đa 5 MB
+const DEFAULT_SOUND = { id: 'classic', rounds: 2 };
+const RINGTONES = [
+  { id: 'classic', name: 'Chuông cổ điển', wave: 'sine', notes: [659.25, 830.61, 987.77, 1318.51], gap: 0.25, dur: 0.9, vol: 0.3, span: 2.2 },
+  { id: 'bell', name: 'Chuông ngân', wave: 'triangle', notes: [880, 1108.73, 1318.51], gap: 0.5, dur: 1.6, vol: 0.3, span: 2.8 },
+  { id: 'digital', name: 'Bíp điện tử', wave: 'square', notes: [1000, 1000, 1000, 1000], gap: 0.2, dur: 0.12, vol: 0.12, span: 1.4 },
+  { id: 'soft', name: 'Nhẹ nhàng', wave: 'sine', notes: [523.25, 659.25, 783.99, 659.25], gap: 0.45, dur: 1.3, vol: 0.25, span: 2.6 },
+  { id: 'sparkle', name: 'Lấp lánh', wave: 'sine', notes: [1046.5, 1318.51, 1567.98, 2093], gap: 0.14, dur: 0.7, vol: 0.22, span: 1.6 },
+  { id: 'alert', name: 'Khẩn cấp', wave: 'sawtooth', notes: [880, 660, 880, 660, 880, 660], gap: 0.22, dur: 0.18, vol: 0.14, span: 1.8 },
+  { id: 'custom', name: 'File nhạc của tôi', custom: true },
+];
+const soundLabel = sd => {
+  const t = RINGTONES.find(x => x.id === (sd && sd.id)) || RINGTONES[0];
+  const n = Math.min(3, Math.max(1, Number(sd && sd.rounds) || 2));
+  return `${t.name} · ${n} lần`;
+};
+
+/* File nhạc tự chọn được lưu trong IndexedDB (localStorage quá nhỏ cho file âm thanh) */
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open('tem_sounds', 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore('files');
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  });
+}
+async function idbRun(mode, fn) {
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('files', mode);
+    const rq = fn(tx.objectStore('files'));
+    tx.oncomplete = () => { db.close(); res(rq && rq.result); };
+    tx.onerror = () => { db.close(); rej(tx.error); };
+  });
+}
+const idbGet = k => idbRun('readonly', st => st.get(k));
+const idbSet = (k, v) => idbRun('readwrite', st => st.put(v, k));
+const idbDel = k => idbRun('readwrite', st => st.delete(k));
+
 let audioCtx = null;
-function playChime(rounds = 2) {
+let currentSound = null;
+function unlockAudio() {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    const notes = [659.25, 830.61, 987.77, 1318.51];
-    for (let r = 0; r < rounds; r++) {
-      notes.forEach((f, i) => {
-        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-        const t = audioCtx.currentTime + r * 2.2 + i * 0.25;
-        o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.linearRampToValueAtTime(0.3, t + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-        o.start(t); o.stop(t + 1);
-      });
-    }
   } catch {}
-  if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
 }
+function stopSound() {
+  if (currentSound) { const c = currentSound; currentSound = null; c.stop(); }
+}
+// Phát nhạc chuông: sound = { id, rounds }. Trả về Promise, xong khi phát hết hoặc bị dừng.
+function playSound(sound) {
+  stopSound();
+  return new Promise(resolve => {
+    const rounds = Math.min(3, Math.max(1, Number(sound && sound.rounds) || 2));
+    const tone = RINGTONES.find(t => t.id === (sound && sound.id)) || RINGTONES[0];
+    const h = { nodes: [], timer: null, audio: null, url: null, finished: false };
+    const finish = () => {
+      if (h.finished) return;
+      h.finished = true;
+      clearTimeout(h.timer);
+      h.nodes.forEach(o => { try { o.stop(); } catch {} });
+      if (h.audio) { try { h.audio.pause(); } catch {} }
+      if (h.url) URL.revokeObjectURL(h.url);
+      if (currentSound === h) currentSound = null;
+      resolve();
+    };
+    h.stop = finish;
+    currentSound = h;
+    const synth = t => {
+      if (h.finished) return;
+      try {
+        unlockAudio();
+        for (let r = 0; r < rounds; r++) {
+          t.notes.forEach((f, i) => {
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+            const at = audioCtx.currentTime + r * t.span + i * t.gap;
+            o.type = t.wave; o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+            g.gain.setValueAtTime(0.0001, at);
+            g.gain.linearRampToValueAtTime(t.vol, at + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, at + t.dur);
+            o.start(at); o.stop(at + t.dur + 0.1);
+            h.nodes.push(o);
+          });
+        }
+        h.timer = setTimeout(finish, (rounds * t.span + 0.5) * 1000);
+      } catch { finish(); }
+    };
+    if (!tone.custom) return synth(tone);
+    idbGet('custom').then(rec => {
+      if (h.finished) return;
+      if (!rec || !rec.blob) return synth(RINGTONES[0]);
+      h.url = URL.createObjectURL(rec.blob);
+      const a = new Audio(h.url);
+      h.audio = a;
+      let left = rounds;
+      a.onended = () => {
+        left -= 1;
+        if (left > 0 && !h.finished) { a.currentTime = 0; a.play().catch(finish); } else finish();
+      };
+      a.onerror = () => synth(RINGTONES[0]);
+      a.play().catch(() => synth(RINGTONES[0]));
+    }).catch(() => synth(RINGTONES[0]));
+  });
+}
+const vibrateAlarm = () => { if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]); };
 
 /* ---------- UI nhỏ ---------- */
 const inputCls = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -316,9 +402,97 @@ function LimitForm({ month, current, onSave, onClose }) {
   );
 }
 
+/* ---------- Chọn nhạc chuông ---------- */
+function SoundPicker({ value, onChange }) {
+  const [playing, setPlaying] = useState(null);
+  const [custom, setCustom] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    idbGet('custom').then(r => r && r.blob && setCustom({ name: r.name })).catch(() => {});
+    return () => stopSound();
+  }, []);
+  const preview = async id => {
+    if (playing === id) return stopSound();
+    setPlaying(id);
+    await playSound({ id, rounds: 1 });
+    setPlaying(p => (p === id ? null : p));
+  };
+  const pickFile = async e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('audio/')) return setErr('Chỉ nhận file âm thanh (MP3, WAV, OGG, M4A)');
+    if (file.size > MAX_SOUND_BYTES) return setErr('File quá lớn, tối đa 5 MB');
+    try {
+      await idbSet('custom', { name: file.name.slice(0, 80), type: file.type, blob: file });
+      setCustom({ name: file.name.slice(0, 80) });
+      setErr('');
+      onChange({ ...value, id: 'custom' });
+    } catch { setErr('Không lưu được file trên máy này'); }
+  };
+  const removeCustom = async () => {
+    stopSound();
+    try { await idbDel('custom'); } catch {}
+    setCustom(null);
+    if (value.id === 'custom') onChange({ ...value, id: 'classic' });
+  };
+  const fileLabel = txt => (
+    <label className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 cursor-pointer shrink-0">{txt}
+      <input type="file" accept="audio/*" className="hidden" onChange={pickFile} /></label>
+  );
+  return (
+    <div>
+      <label className={labelCls}>Nhạc chuông</label>
+      <ErrorBox msg={err} />
+      <div className="space-y-1.5">
+        {RINGTONES.map(t => {
+          const picked = value.id === t.id;
+          if (t.custom && !custom) {
+            return (
+              <div key={t.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 bg-slate-50">
+                <span className="text-sm text-slate-600">Chọn file nhạc của bạn (tối đa 5 MB)</span>
+                {fileLabel('Chọn file')}
+              </div>);
+          }
+          return (
+            <div key={t.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${picked ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+              <button type="button" onClick={() => onChange({ ...value, id: t.id })} className="flex-1 min-w-0 flex items-center gap-2 text-left">
+                <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${picked ? 'border-amber-500 bg-amber-500' : 'border-slate-300'}`} />
+                <span className="text-sm font-semibold truncate">{t.custom ? custom.name : t.name}</span>
+              </button>
+              <button type="button" onClick={() => preview(t.id)} className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 shrink-0">{playing === t.id ? '■ Dừng' : '▶ Nghe thử'}</button>
+              {t.custom && fileLabel('Đổi')}
+              {t.custom && <button type="button" onClick={removeCustom} className="text-slate-400 hover:text-rose-600 px-1" title="Xóa file">🗑</button>}
+            </div>);
+        })}
+      </div>
+      <div className="mt-3">
+        <label className={labelCls}>Số lần lặp</label>
+        <div className="grid grid-cols-3 gap-2">
+          {[1, 2, 3].map(n => (
+            <button type="button" key={n} onClick={() => onChange({ ...value, rounds: n })}
+              className={`py-2 text-xs font-bold rounded-xl border ${value.rounds === n ? 'bg-amber-50 border-amber-400 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>{n} lần</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SoundForm({ reminder, onSave, onClose }) {
+  const [v, setV] = useState({ ...DEFAULT_SOUND, ...(reminder && reminder.sound) });
+  return (
+    <Sheet title="Đổi nhạc chuông" onClose={() => { stopSound(); onClose(); }}>
+      <p className="text-sm font-bold mb-3 truncate">{reminder && reminder.title}</p>
+      <SoundPicker value={v} onChange={setV} />
+      <button onClick={() => { stopSound(); onSave(v); onClose(); }} className="mt-4 w-full py-2.5 rounded-xl bg-amber-500 text-white font-bold">Lưu nhạc chuông</button>
+    </Sheet>
+  );
+}
+
 /* ---------- Form Nhắc nhở ---------- */
 function ReminderForm({ onSave, onClose }) {
-  const [f, setF] = useState({ title: '', note: '', type: 'once', date: todayStr(), dayOfMonth: 1, time: '' });
+  const [f, setF] = useState({ title: '', note: '', type: 'once', date: todayStr(), dayOfMonth: 1, time: '', sound: { ...DEFAULT_SOUND } });
   const [err, setErr] = useState('');
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const submit = e => {
@@ -330,6 +504,7 @@ function ReminderForm({ onSave, onClose }) {
       id: uid(), title: f.title.trim(), note: f.note.trim(), type: f.type, time: f.time,
       date: f.type === 'once' ? f.date : null,
       dayOfMonth: f.type === 'monthly' ? Number(f.dayOfMonth) : null,
+      sound: { id: f.sound.id, rounds: f.sound.rounds },
       enabled: true, fired: false, lastFired: null, createdAt: new Date().toISOString(),
     });
     onClose();
@@ -354,7 +529,8 @@ function ReminderForm({ onSave, onClose }) {
           </select></div>}
         <div><label className={labelCls}>Giờ reo chuông</label>
           <input type="time" className={inputCls} value={f.time} onChange={e => set('time', e.target.value)} /></div>
-        <p className="text-xs text-slate-500">Lưu ý: nhắc nhở chỉ reo khi trang đang mở trên máy. Nếu đóng trình duyệt hoặc khóa điện thoại lâu, sẽ không reo.</p>
+        <SoundPicker value={f.sound} onChange={v => set('sound', v)} />
+        <p className="text-xs text-slate-500">Lưu ý: bản web chỉ reo khi trang đang mở trên máy. Đóng trình duyệt hoặc khóa điện thoại lâu thì sẽ không reo (cần bản Android để reo khi tắt màn hình).</p>
         <button className="w-full py-2.5 rounded-xl bg-amber-500 text-white font-bold">Lưu nhắc nhở</button>
       </form>
     </Sheet>
@@ -475,7 +651,7 @@ function ExpensesView({ expenses, limits, month, setMonth, onAdd, onDelete, onSe
   );
 }
 
-function RemindersView({ reminders, onToggle, onDelete, onAdd, onTest }) {
+function RemindersView({ reminders, onToggle, onDelete, onAdd, onTest, onChangeSound }) {
   const active = reminders.filter(r => r.enabled).length;
   const typeLabel = r => r.type === 'daily' ? 'Hàng ngày' : r.type === 'monthly' ? `Ngày ${r.dayOfMonth} hàng tháng` : `Ngày ${fmtDate(r.date)}`;
   return (
@@ -490,7 +666,8 @@ function RemindersView({ reminders, onToggle, onDelete, onAdd, onTest }) {
             <div className="flex-1 min-w-0">
               <div className="font-bold text-sm truncate">{r.title}</div>
               {r.note && <p className="text-xs text-slate-500 truncate">{r.note}</p>}
-              <div className="text-xs mt-1 flex gap-2"><span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg">{r.time}</span><span className="text-slate-500">{typeLabel(r)}</span></div>
+              <div className="text-xs mt-1 flex flex-wrap items-center gap-2"><span className="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg">{r.time}</span><span className="text-slate-500">{typeLabel(r)}</span></div>
+              <button onClick={() => onChangeSound(r)} className="mt-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg truncate max-w-full">🎵 {soundLabel(r.sound)} · đổi</button>
               {r.type === 'once' && r.fired && <div className="text-[11px] text-emerald-700 mt-1">✓ Đã nhắc</div>}
             </div>
             <button onClick={() => onToggle(r.id)} className={`w-11 h-6 rounded-full relative ${r.enabled ? 'bg-amber-500' : 'bg-slate-200'}`}>
@@ -580,6 +757,7 @@ function App() {
   const [month, setMonth] = useState(monthStr());
   const [modal, setModal] = useState(null);
   const [alarm, setAlarm] = useState(null);
+  const [editSound, setEditSound] = useState(null);
 
   useEffect(() => save(KEYS.tasks, tasks), [tasks]);
   useEffect(() => save(KEYS.expenses, expenses), [expenses]);
@@ -593,7 +771,8 @@ function App() {
   useEffect(() => {
     const fire = r => {
       setAlarm(r);
-      playChime(2);
+      playSound(r.sound || DEFAULT_SOUND);
+      vibrateAlarm();
       if ('Notification' in window && Notification.permission === 'granted') {
         try { new Notification('⏰ ' + r.title, { body: r.note || `Giờ hẹn: ${r.time}` }); } catch {}
       }
@@ -619,6 +798,12 @@ function App() {
     document.addEventListener('visibilitychange', check);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', check); };
   }, []);
+
+  useEffect(() => {
+    document.addEventListener('pointerdown', unlockAudio, { once: true });
+    return () => document.removeEventListener('pointerdown', unlockAudio);
+  }, []);
+  const dismissAlarm = () => { stopSound(); setAlarm(null); };
 
   const requestNotif = () => {
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
@@ -661,14 +846,14 @@ function App() {
       {alarm && (
         <div className="fixed top-3 inset-x-3 z-50 bg-gradient-to-r from-rose-600 to-amber-600 text-white rounded-2xl p-3.5 shadow-2xl flex items-center justify-between">
           <div className="min-w-0"><div className="text-[10px] uppercase text-amber-200 font-bold">Đến giờ hẹn</div><div className="text-sm font-extrabold truncate">{alarm.title}</div></div>
-          <button onClick={() => setAlarm(null)} className="bg-white text-rose-700 font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">Tắt chuông</button>
+          <button onClick={dismissAlarm} className="bg-white text-rose-700 font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">Tắt chuông</button>
         </div>
       )}
       <Header title={titles[tab][0]} subtitle={titles[tab][1]} right={headerRight} />
       <main className="flex-1 overflow-y-auto">
         {tab === 'tasks' && <TasksView tasks={tasks} date={date} setDate={setDate} onAdd={() => setModal('task')} onToggle={toggleTask} onDelete={deleteTask} />}
         {tab === 'expenses' && <ExpensesView expenses={expenses} limits={limits} month={month} setMonth={setMonth} onAdd={() => setModal('expense')} onDelete={deleteExpense} onSetLimit={() => setModal('limit')} />}
-        {tab === 'reminders' && <RemindersView reminders={reminders} onToggle={toggleReminder} onDelete={deleteReminder} onAdd={() => setModal('reminder')} onTest={() => { playChime(1); requestNotif(); }} />}
+        {tab === 'reminders' && <RemindersView reminders={reminders} onToggle={toggleReminder} onDelete={deleteReminder} onAdd={() => setModal('reminder')} onTest={() => { playSound({ id: 'classic', rounds: 1 }); requestNotif(); }} onChangeSound={r => { setEditSound(r.id); setModal('sound'); }} />}
         {tab === 'report' && <ReportView tasks={tasks} expenses={expenses} limits={limits} month={month} setMonth={setMonth} onImport={importAll}
           data={{ tasks, expenses, limits, reminders }} />}
       </main>
@@ -686,6 +871,7 @@ function App() {
       {modal === 'task' && <TaskForm date={date} onSave={addTask => setTasks(p => [{ ...addTask }, ...p])} onClose={() => setModal(null)} />}
       {modal === 'expense' && <ExpenseForm onSave={addExpense} onClose={() => setModal(null)} />}
       {modal === 'reminder' && <ReminderForm onSave={addReminder} onClose={() => setModal(null)} />}
+      {modal === 'sound' && editSound && <SoundForm reminder={reminders.find(r => r.id === editSound)} onSave={sound => setReminders(p => p.map(x => x.id === editSound ? { ...x, sound } : x))} onClose={() => { setModal(null); setEditSound(null); }} />}
       {modal === 'limit' && <LimitForm month={month} current={limitFor(limits, month)} onSave={setLimit} onClose={() => setModal(null)} />}
       {modal === 'pin' && <PinSettings pinHash={pinHash} onSave={savePin} onClose={() => setModal(null)} />}
     </div>
