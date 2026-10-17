@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Khóa PIN</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+a{color:inherit;text-decoration:none}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:#F6F4EF;display:flex;flex-direction:column;align-items:center;padding:96px 24px 32px;position:relative;overflow:hidden">
+  <div style="font-size:24px;font-weight:700;color:#1B1F24">Nhập mã PIN</div>
+  <div style="margin-top:8px;font-size:14px;color:#5B6470">Nhập 4 số để mở ứng dụng</div>
+  <div style="margin-top:32px;display:flex;gap:18px">
+    <sc-for list="{{dots}}" as="d" hint-placeholder-count="4">
+      <div style="width:16px;height:16px;border-radius:8px;box-sizing:border-box;{{d.style}}"></div>
+    </sc-for>
+  </div>
+  <div style="margin-top:16px;min-height:20px;font-size:13px;color:#5B6470">{{status}}</div>
+  <div style="margin-top:12px;width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+    <sc-for list="{{keys}}" as="k" hint-placeholder-count="12">
+      <button onClick="{{k.pick}}" aria-label="{{k.aria}}" style="height:72px;border-radius:36px;font-size:{{k.size}};font-weight:{{k.weight}};color:{{k.color}};border:{{k.border}};background:{{k.bg}};font-family:inherit;cursor:pointer">{{k.label}}</button>
+    </sc-for>
+  </div>
+  <div style="margin-top:auto;font-size:12px;color:#5B6470;text-align:center;line-height:1.5">PIN được lưu dưới dạng băm PBKDF2 có muối, không lưu dạng rõ.<br>Tự khóa sau 1 phút khi ứng dụng chạy nền.</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const pin = this.state.pin ?? '';
+const full = pin.length === 4;
+const add = (d) => {
+const cur = this.state.pin ?? '';
+if (cur.length < 4) this.setState({ pin: cur + d });
+};
+const del = () => {
+const cur = this.state.pin ?? '';
+this.setState({ pin: cur.slice(0, -1) });
+};
+const dots = [0, 1, 2, 3].map((i) => ({
+style: i < pin.length
+? 'background:#0F766E;border:none'
+: 'background:transparent;border:2px solid #5B6470'
+}));
+const digitKeys = ['1','2','3','4','5','6','7','8','9'].map((d) => ({
+label: d, aria: 'Số ' + d, pick: () => add(d),
+size: '26px', weight: '500', color: '#1B1F24', border: '1px solid #E3DFD6', bg: '#FFFFFF'
+}));
+const keys = [
+...digitKeys,
+{ label: 'Quên?', aria: 'Quên PIN', pick: () => {}, size: '15px', weight: '600', color: '#0F766E', border: 'none', bg: 'transparent' },
+{ label: '0', aria: 'Số 0', pick: () => add('0'), size: '26px', weight: '500', color: '#1B1F24', border: '1px solid #E3DFD6', bg: '#FFFFFF' },
+{ label: '⌫', aria: 'Xóa một số', pick: () => del(), size: '22px', weight: '500', color: '#1B1F24', border: 'none', bg: 'transparent' }
+];
+const status = full ? 'Đã nhập đủ 4 số' : 'Còn ' + (4 - pin.length) + ' số';
+return { dots, keys, status };
+}
+}
+</script>
+</body>
+</html>

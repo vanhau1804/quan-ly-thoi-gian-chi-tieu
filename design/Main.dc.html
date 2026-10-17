@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Công việc</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+a{color:inherit;text-decoration:none}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:#F6F4EF;display:flex;flex-direction:column;position:relative;overflow:hidden">
+  <div style="padding:56px 20px 8px">
+    <div style="font-size:14px;color:#5B6470">Thứ Sáu, 16 tháng 10</div>
+    <h1 style="margin:4px 0 0;font-size:28px;font-weight:700;color:#1B1F24">Hôm nay</h1>
+  </div>
+  <div style="margin:8px 20px 12px;padding:16px;background:#0F766E;border-radius:16px;color:#FFFFFF">
+    <div style="font-size:13px">Đã hoàn thành</div>
+    <div style="font-size:24px;font-weight:700">{{prog.label}}</div>
+    <div style="margin-top:12px;height:8px;background:rgba(255,255,255,.3);border-radius:4px"><div style="width:{{prog.w}};height:8px;background:#FFFFFF;border-radius:4px"></div></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;padding:0 20px">
+    <sc-for list="{{tasks}}" as="t" hint-placeholder-count="5">
+      <button onClick="{{t.toggle}}" aria-label="{{t.aria}}" style="all:unset;cursor:pointer;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:14px 16px;background:#FFFFFF;border:1px solid #E3DFD6;border-radius:14px">
+        <span style="width:24px;height:24px;border-radius:12px;box-sizing:border-box;font-size:14px;line-height:20px;text-align:center;{{t.box}}">{{t.mark}}</span>
+        <span style="flex:1"><span style="display:block;font-size:16px;font-weight:600;{{t.text}}">{{t.title}}</span><span style="display:block;font-size:13px;color:#5B6470">{{t.meta}}</span></span>
+      </button>
+    </sc-for>
+  </div>
+  <a href="TaskForm.dc.html" aria-label="Thêm việc" style="position:absolute;right:20px;bottom:100px;width:56px;height:56px;border-radius:28px;background:#B45309;color:#FFFFFF;font-size:30px;box-shadow:0 4px 12px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center">+</a>
+  <div style="position:absolute;left:0;right:0;bottom:0;height:84px;box-sizing:border-box;padding-top:8px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#FFFFFF;border-top:1px solid #E3DFD6">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#0F766E"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="m9 15 2 2 4-4"/></svg>Công việc</div>
+    <a href="Expenses.dc.html" style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#5B6470"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Chi tiêu</a>
+    <a href="Reminders.dc.html" style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#5B6470"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>Nhắc nhở</a>
+    <a href="Report.dc.html" style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#5B6470"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Báo cáo</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const init = { 1: true, 2: true, 3: false, 4: false, 5: false };
+const base = [
+{ id: 1, title: 'Viết báo cáo tuần', meta: '09:00 · Công việc' },
+{ id: 2, title: 'Họp nhóm dự án', meta: '10:30 · Công việc' },
+{ id: 3, title: 'Tập gym', meta: '18:00 · Sức khỏe' },
+{ id: 4, title: 'Gọi điện cho mẹ', meta: '20:00 · Gia đình' },
+{ id: 5, title: 'Đọc 20 trang sách', meta: '21:00 · Cá nhân' }
+];
+const done = this.state.done ?? init;
+const tasks = base.map((t) => {
+const on = !!done[t.id];
+return {
+...t,
+aria: (on ? 'Bỏ đánh dấu ' : 'Đánh dấu xong ') + t.title,
+mark: on ? '✓' : '',
+box: on ? 'background:#0F766E;color:#FFFFFF;border:2px solid #0F766E' : 'background:#FFFFFF;color:#FFFFFF;border:2px solid #0F766E',
+text: on ? 'color:#5B6470;text-decoration:line-through' : 'color:#1B1F24',
+toggle: () => this.setState({ done: { ...done, [t.id]: !on } })
+};
+});
+const n = tasks.filter((t) => t.mark === '✓').length;
+const prog = { label: n + ' / ' + tasks.length + ' việc', w: Math.round((n / tasks.length) * 100) + '%' };
+return { tasks, prog };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Nhắc nhở</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+a{color:inherit;text-decoration:none}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:#F6F4EF;display:flex;flex-direction:column;position:relative;overflow:hidden">
+  <div style="padding:56px 20px 8px">
+    <h1 style="margin:0;font-size:28px;font-weight:700;color:#1B1F24">Nhắc nhở</h1>
+  </div>
+  <div style="margin:8px 20px 0;padding:14px 16px;background:#FFFFFF;border:1px solid #E3DFD6;border-radius:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><div style="font-size:30px;font-weight:700;color:#1B1F24">06:30</div><div style="font-size:13px;color:#5B6470">Báo thức dậy sớm · {{repeatLabel}}</div></div>
+      <button onClick="{{toggleOn}}" aria-label="{{onAria}}" aria-pressed="{{onPressed}}" style="all:unset;cursor:pointer;width:48px;height:28px;border-radius:14px;box-sizing:border-box;position:relative;{{switchBg}}"><span style="position:absolute;top:3px;width:22px;height:22px;border-radius:11px;background:#FFFFFF;{{knob}}"></span></button>
+    </div>
+    <div style="margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+      <sc-for list="{{repeats}}" as="r" hint-placeholder-count="3">
+        <button onClick="{{r.pick}}" aria-pressed="{{r.pressed}}" style="all:unset;cursor:pointer;box-sizing:border-box;padding:8px 0;border-radius:10px;text-align:center;font-size:13px;{{r.style}}">{{r.label}}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="padding:16px 20px 8px;font-size:14px;font-weight:600;color:#1B1F24">Nhạc chuông · chạm để chọn</div>
+  <div style="display:flex;flex-direction:column;gap:8px;padding:0 20px">
+    <sc-for list="{{chimes}}" as="c" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#FFFFFF;border-radius:14px;{{c.rowBorder}}">
+        <button onClick="{{c.pick}}" aria-label="Chọn {{c.name}}" style="all:unset;cursor:pointer;display:flex;align-items:center;gap:12px;flex:1">
+          <span style="width:20px;height:20px;border-radius:10px;box-sizing:border-box;{{c.dot}}"></span>
+          <span style="flex:1;font-size:15px;font-weight:600;color:#1B1F24">{{c.name}}</span>
+        </button>
+        <span style="font-size:13px;color:#5B6470">{{c.tag}}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:0;height:84px;box-sizing:border-box;padding-top:8px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#FFFFFF;border-top:1px solid #E3DFD6">
+    <a href="Main.dc.html" style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#5B6470"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="m9 15 2 2 4-4"/></svg>Công việc</a>
+    <a href="Expenses.dc.html" style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#5B6470"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>Chi tiêu</a>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#0F766E"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>Nhắc nhở</div>
+    <a href="Report.dc.html" style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:#5B6470"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Báo cáo</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const st = this.state;
+const sel = st.sel ?? 'classic';
+const rep = st.rep ?? 1;
+const on = st.on ?? true;
+const names = [
+{ id: 'classic', name: 'Chuông cổ điển', tag: 'Mặc định' },
+{ id: 'sea', name: 'Sóng biển', tag: '' },
+{ id: 'wind', name: 'Chuông gió', tag: '' },
+{ id: 'mine', name: 'Chọn file của tôi (tối đa 5 MB)', tag: 'MP3 / OGG' }
+];
+const chimes = names.map((x) => {
+const picked = sel === x.id;
+return {
+...x,
+rowBorder: picked ? 'border:2px solid #0F766E' : 'border:1px solid #E3DFD6',
+dot: picked ? 'border:2px solid #0F766E;background:radial-gradient(circle,#0F766E 40%,#FFFFFF 45%)' : 'border:2px solid #5B6470;background:#FFFFFF',
+pick: () => this.setState({ sel: x.id })
+};
+});
+const repeats = [1, 2, 3].map((n) => {
+const picked = rep === n;
+return {
+label: 'Lặp ' + n + ' lần',
+pressed: picked ? 'true' : 'false',
+style: picked ? 'background:#0F766E;color:#FFFFFF;font-weight:600' : 'background:#EDEAE2;color:#1B1F24',
+pick: () => this.setState({ rep: n })
+};
+});
+const repeatLabel = rep === 1 ? 'Lặp 1 lần' : 'Lặp ' + rep + ' lần';
+return {
+chimes,
+repeats,
+repeatLabel,
+onPressed: on ? 'true' : 'false',
+onAria: on ? 'Tắt báo thức' : 'Bật báo thức',
+switchBg: on ? 'background:#0F766E' : 'background:#B8B2A6',
+knob: on ? 'right:3px' : 'left:3px',
+toggleOn: () => this.setState({ on: !on })
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Báo thức</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:#0E1116;color:#F5F5F5;display:flex;flex-direction:column;align-items:center;position:relative;overflow:hidden;padding:72px 24px 40px">
+  <div style="font-size:16px;color:#C9CED6">Thứ Sáu, 16 tháng 10</div>
+  <div style="margin-top:8px;font-size:96px;font-weight:700;line-height:1;letter-spacing:-2px">06:30</div>
+  <div style="margin-top:14px;font-size:18px;font-weight:600">Báo thức dậy sớm</div>
+  <div style="margin-top:4px;font-size:14px;color:#C9CED6">Chuông cổ điển · Lặp 1 lần</div>
+  <div style="margin-top:28px;padding:10px 14px;border-radius:12px;background:#1F2630;font-size:13px;line-height:1.5;color:#E6E9EE;text-align:center">Báo thức đặt bởi ứng dụng. Chuông vẫn kêu khi app đóng và màn hình tắt (cần bản Android native).</div>
+  <div style="flex:1"></div>
+  <div style="width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
+    <a href="Alarm.dc.html" style="height:72px;border-radius:36px;background:#2A3340;color:#F5F5F5;font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center">Báo lại 5 phút</a>
+    <a href="Main.dc.html" style="height:72px;border-radius:36px;background:#BE123C;color:#FFFFFF;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center">Tắt</a>
+  </div>
+  <div style="margin-top:20px;font-size:13px;color:#C9CED6">Vuốt lên để mở ứng dụng</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

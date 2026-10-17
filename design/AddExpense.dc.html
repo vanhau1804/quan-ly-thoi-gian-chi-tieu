@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Thêm chi tiêu</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+a{color:inherit;text-decoration:none}
+label{display:block}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:rgba(14,17,22,.45);position:relative;overflow:hidden">
+  <div style="position:absolute;left:0;right:0;bottom:0;box-sizing:border-box;padding:20px 20px 28px;background:#FFFFFF;border-radius:20px 20px 0 0;display:flex;flex-direction:column;gap:14px">
+    <div style="width:40px;height:4px;border-radius:2px;background:#E3DFD6;align-self:center"></div>
+    <h2 style="margin:0;font-size:20px;font-weight:700;color:#1B1F24">Thêm chi tiêu</h2>
+    <label style="font-size:13px;font-weight:600;color:#1B1F24">Số tiền (₫)
+      <input type="text" inputmode="numeric" placeholder="0" style="margin-top:6px;width:100%;box-sizing:border-box;height:52px;padding:0 14px;border-radius:12px;border:1px solid #5B6470;font-size:18px;font-family:inherit;color:#1B1F24">
+    </label>
+    <div style="font-size:13px;font-weight:600;color:#1B1F24">Danh mục</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="4">
+        <button onClick="{{c.pick}}" aria-pressed="{{c.pressed}}" style="height:36px;padding:0 14px;border-radius:18px;font-size:14px;font-family:inherit;cursor:pointer;{{c.style}}">{{c.label}}</button>
+      </sc-for>
+    </div>
+    <label style="font-size:13px;font-weight:600;color:#1B1F24">Ngày
+      <input type="date" value="2026-10-16" style="margin-top:6px;width:100%;box-sizing:border-box;height:52px;padding:0 14px;border-radius:12px;border:1px solid #5B6470;font-size:16px;font-family:inherit;color:#1B1F24">
+    </label>
+    <label style="font-size:13px;font-weight:600;color:#1B1F24">Ghi chú (không bắt buộc)
+      <input type="text" placeholder="Ví dụ: cà phê với khách" style="margin-top:6px;width:100%;box-sizing:border-box;height:52px;padding:0 14px;border-radius:12px;border:1px solid #5B6470;font-size:16px;font-family:inherit;color:#1B1F24">
+    </label>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:4px">
+      <a href="Expenses.dc.html" style="height:52px;border-radius:26px;border:1px solid #5B6470;background:#FFFFFF;color:#1B1F24;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center">Hủy</a>
+      <a href="Expenses.dc.html" style="height:52px;border-radius:26px;background:#B45309;color:#FFFFFF;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center">Lưu</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const cur = this.state.cat ?? 'Ăn uống';
+const cats = ['Ăn uống', 'Đi lại', 'Hóa đơn', 'Khác'].map((c) => {
+const on = cur === c;
+return {
+label: c,
+pressed: on ? 'true' : 'false',
+style: on ? 'border:none;background:#B45309;color:#FFFFFF' : 'border:1px solid #5B6470;background:#FFFFFF;color:#1B1F24',
+pick: () => this.setState({ cat: c })
+};
+});
+return { cats };
+}
+}
+</script>
+</body>
+</html>
