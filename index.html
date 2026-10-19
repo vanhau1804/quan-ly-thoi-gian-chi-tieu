@@ -173,6 +173,20 @@ function playSound(sound) {
 }
 const vibrateAlarm = () => { if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]); };
 
+// Hiện thông báo hệ thống. Android Chrome không cho `new Notification` từ trang, phải đi qua service worker.
+async function showAlarmNotification(title, body, tag) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+  const opts = { body, tag, renotify: true, requireInteraction: true, vibrate: [500, 200, 500, 200, 500] };
+  try {
+    const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+    if (reg) { await reg.showNotification(title, opts); return true; }
+  } catch {}
+  try { new Notification(title, opts); return true; } catch { return false; }
+}
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
 /* ---------- UI nhỏ ---------- */
 const inputCls = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
 const labelCls = "block text-xs font-bold text-slate-700 mb-1";
@@ -499,13 +513,17 @@ function ReminderForm({ onSave, onClose }) {
     e.preventDefault();
     if (!f.title.trim()) return setErr('Nhập tiêu đề nhắc nhở');
     if (!f.time) return setErr('Chọn giờ reo chuông');
-    if (f.type === 'once' && !f.date) return setErr('Chọn ngày nhắc');
+    if (f.type === 'once') {
+      if (!f.date) return setErr('Chọn ngày nhắc');
+      const at = new Date(`${f.date}T${f.time}`);
+      if (isNaN(at.getTime()) || at.getTime() <= Date.now()) return setErr('Thời điểm này đã qua. Hãy chọn giờ hoặc ngày ở phía sau.');
+    }
     onSave({
       id: uid(), title: f.title.trim(), note: f.note.trim(), type: f.type, time: f.time,
       date: f.type === 'once' ? f.date : null,
       dayOfMonth: f.type === 'monthly' ? Number(f.dayOfMonth) : null,
       sound: { id: f.sound.id, rounds: f.sound.rounds },
-      enabled: true, fired: false, lastFired: null, createdAt: new Date().toISOString(),
+      enabled: true, fired: false, lastFired: f.type !== 'once' && f.time <= nowHM() ? todayStr() : null, createdAt: new Date().toISOString(),
     });
     onClose();
   };
@@ -653,12 +671,22 @@ function ExpensesView({ expenses, limits, month, setMonth, onAdd, onDelete, onSe
 
 function RemindersView({ reminders, onToggle, onDelete, onAdd, onTest, onChangeSound }) {
   const active = reminders.filter(r => r.enabled).length;
+  const [perm, setPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
+  const askPerm = () => { try { Promise.resolve(Notification.requestPermission()).then(setPerm); } catch {} };
   const typeLabel = r => r.type === 'daily' ? 'Hàng ngày' : r.type === 'monthly' ? `Ngày ${r.dayOfMonth} hàng tháng` : `Ngày ${fmtDate(r.date)}`;
   return (
     <div className="p-4 space-y-4 pb-24">
       <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-3xl p-4 text-white flex justify-between items-center">
         <div><div className="font-bold">Nhắc nhở & báo giờ</div><div className="text-xs text-amber-100">{active} lịch đang bật</div></div>
         <button onClick={onTest} className="bg-white/25 text-xs font-bold px-3 py-1.5 rounded-full">🔔 Thử chuông</button>
+      </div>
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-900 space-y-2">
+        <div className="font-bold">Cách báo của bản web</div>
+        <p className="leading-relaxed">Báo đúng giờ khi app đang mở hoặc chạy nền. Khi khóa màn hình lâu hoặc đóng app, trình duyệt tạm dừng trang nên có thể báo trễ đến lúc bạn mở lại (app sẽ ghi "Đã lỡ"). Muốn reo chắc chắn khi tắt màn hình cần bản Android.</p>
+        <div className="flex items-center justify-between gap-2">
+          <span>Thông báo: <b>{perm === 'granted' ? 'đã bật' : perm === 'denied' ? 'bị chặn (bật lại trong cài đặt trình duyệt)' : perm === 'unsupported' ? 'trình duyệt không hỗ trợ' : 'chưa bật'}</b></span>
+          {perm === 'default' && <button onClick={askPerm} className="bg-amber-500 text-white font-bold px-3 py-1.5 rounded-lg shrink-0">Bật thông báo</button>}
+        </div>
       </div>
       {reminders.length === 0 ? <div className="bg-white rounded-2xl p-5 text-center text-sm text-slate-500">Chưa có lịch nhắc nhở</div> :
         <div className="space-y-2">{reminders.map(r => (
@@ -769,34 +797,54 @@ function App() {
   const remRef = useRef(reminders);
   remRef.current = reminders;
   useEffect(() => {
-    const fire = r => {
-      setAlarm(r);
+    const fire = (r, missedLabel) => {
+      setAlarm({ ...r, missedLabel });
       playSound(r.sound || DEFAULT_SOUND);
       vibrateAlarm();
-      if ('Notification' in window && Notification.permission === 'granted') {
-        try { new Notification('⏰ ' + r.title, { body: r.note || `Giờ hẹn: ${r.time}` }); } catch {}
-      }
+      showAlarmNotification((missedLabel ? '⏰ Đã lỡ: ' : '⏰ ') + r.title, r.note || `Giờ hẹn: ${missedLabel || r.time}`, 'rem-' + r.id);
     };
     const check = () => {
-      const now = new Date(), today = todayStr(), hm = nowHM();
+      const now = new Date(), today = todayStr();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
       let changed = false;
       const next = remRef.current.map(r => {
-        if (!r.enabled || !r.time || r.time > hm) return r;
-        let due = false;
-        if (r.type === 'once') due = r.date === today && !r.fired;
-        if (r.type === 'daily') due = r.lastFired !== today;
-        if (r.type === 'monthly') due = Number(r.dayOfMonth) === now.getDate() && r.lastFired !== today;
+        if (!r.enabled || !r.time) return r;
+        const [h, m] = r.time.split(':').map(Number);
+        const lateMin = nowMin - (h * 60 + m); // số phút đã trễ so với giờ hẹn hôm nay
+        let due = false, missedLabel = null;
+        if (r.type === 'once') {
+          if (r.fired) return r;
+          if (r.date < today) { due = true; missedLabel = `${r.time} ngày ${fmtDate(r.date)}`; }
+          else if (r.date === today && lateMin >= 0) { due = true; if (lateMin > 2) missedLabel = r.time; }
+        } else if (lateMin >= 0) {
+          if (r.type === 'daily') due = r.lastFired !== today;
+          if (r.type === 'monthly') due = Number(r.dayOfMonth) === now.getDate() && r.lastFired !== today;
+          if (due && lateMin > 2) missedLabel = r.time;
+        }
         if (!due) return r;
         changed = true;
-        fire(r);
+        fire(r, missedLabel);
         return r.type === 'once' ? { ...r, fired: true, enabled: false } : { ...r, lastFired: today };
       });
       if (changed) setReminders(next);
     };
     check();
-    const id = setInterval(check, 5000);
+    // Worker không bị trình duyệt làm chậm khi tab chạy nền như setInterval của trang
+    let worker = null, timer = null;
+    try {
+      worker = new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(1)},5000)'], { type: 'text/javascript' })));
+      worker.onmessage = check;
+    } catch { timer = setInterval(check, 5000); }
     document.addEventListener('visibilitychange', check);
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', check); };
+    window.addEventListener('focus', check);
+    window.addEventListener('pageshow', check);
+    return () => {
+      if (worker) worker.terminate();
+      if (timer) clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
+      window.removeEventListener('pageshow', check);
+    };
   }, []);
 
   useEffect(() => {
@@ -814,7 +862,15 @@ function App() {
   const addExpense = e => setExpenses(p => [e, ...p]);
   const deleteExpense = id => setExpenses(p => p.filter(e => e.id !== id));
   const setLimit = (m, amount) => setLimits(p => ({ ...p, [m]: amount }));
-  const toggleReminder = id => setReminders(p => p.map(r => r.id === id ? { ...r, enabled: !r.enabled, fired: false } : r));
+  const toggleReminder = id => setReminders(p => p.map(r => {
+    if (r.id !== id) return r;
+    if (r.enabled) return { ...r, enabled: false };
+    if (r.type === 'once' && new Date(`${r.date}T${r.time}`).getTime() <= Date.now()) {
+      setTimeout(() => alert('Thời điểm nhắc đã qua. Hãy tạo nhắc nhở mới.'), 0);
+      return r;
+    }
+    return { ...r, enabled: true, fired: false, lastFired: r.type !== 'once' && r.time <= nowHM() ? todayStr() : r.lastFired };
+  }));
   const deleteReminder = id => setReminders(p => p.filter(r => r.id !== id));
   const addReminder = r => { requestNotif(); setReminders(p => [r, ...p]); };
 
@@ -845,7 +901,7 @@ function App() {
     <div className="min-h-screen max-w-md mx-auto bg-slate-50 flex flex-col relative">
       {alarm && (
         <div className="fixed top-3 inset-x-3 z-50 bg-gradient-to-r from-rose-600 to-amber-600 text-white rounded-2xl p-3.5 shadow-2xl flex items-center justify-between">
-          <div className="min-w-0"><div className="text-[10px] uppercase text-amber-200 font-bold">Đến giờ hẹn</div><div className="text-sm font-extrabold truncate">{alarm.title}</div></div>
+          <div className="min-w-0"><div className="text-[10px] uppercase text-amber-200 font-bold">{alarm.missedLabel ? `Đã lỡ giờ hẹn ${alarm.missedLabel}` : 'Đến giờ hẹn'}</div><div className="text-sm font-extrabold truncate">{alarm.title}</div></div>
           <button onClick={dismissAlarm} className="bg-white text-rose-700 font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">Tắt chuông</button>
         </div>
       )}
@@ -853,7 +909,7 @@ function App() {
       <main className="flex-1 overflow-y-auto">
         {tab === 'tasks' && <TasksView tasks={tasks} date={date} setDate={setDate} onAdd={() => setModal('task')} onToggle={toggleTask} onDelete={deleteTask} />}
         {tab === 'expenses' && <ExpensesView expenses={expenses} limits={limits} month={month} setMonth={setMonth} onAdd={() => setModal('expense')} onDelete={deleteExpense} onSetLimit={() => setModal('limit')} />}
-        {tab === 'reminders' && <RemindersView reminders={reminders} onToggle={toggleReminder} onDelete={deleteReminder} onAdd={() => setModal('reminder')} onTest={() => { playSound({ id: 'classic', rounds: 1 }); requestNotif(); }} onChangeSound={r => { setEditSound(r.id); setModal('sound'); }} />}
+        {tab === 'reminders' && <RemindersView reminders={reminders} onToggle={toggleReminder} onDelete={deleteReminder} onAdd={() => setModal('reminder')} onTest={() => { playSound({ id: 'classic', rounds: 1 }); requestNotif(); showAlarmNotification('🔔 Thông báo thử', 'Nếu bạn thấy thông báo này thì app báo được khi chạy nền.', 'test'); }} onChangeSound={r => { setEditSound(r.id); setModal('sound'); }} />}
         {tab === 'report' && <ReportView tasks={tasks} expenses={expenses} limits={limits} month={month} setMonth={setMonth} onImport={importAll}
           data={{ tasks, expenses, limits, reminders }} />}
       </main>
